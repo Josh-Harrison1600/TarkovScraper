@@ -77,6 +77,7 @@ async function scrapeGuns() {
 
     for (const [category, gunList] of Object.entries(guns)) {
       for (const gun of gunList) {
+        //make sure the GL sidearm isn't put in the table
         if(gun !== "M32A1"){
           await connection.query(
             `INSERT INTO guns (name, category) VALUES (?, ?) ON DUPLICATE KEY UPDATE category=VALUES(category)`,
