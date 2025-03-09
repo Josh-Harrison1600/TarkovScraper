@@ -1,6 +1,7 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import db from "./db";
+import serverless from "serverless-http";
 
 const app = express();
 const PORT = 3000;
@@ -11,6 +12,18 @@ app.use(cors({
     methods: ["GET"],
 }));
 
+//enforce api key
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const apiKey = req.headers["x-api-key"];
+    const validApiKey = process.env.API_KEY;
+
+    //check if api key is valid
+    if(!apiKey || apiKey !== validApiKey){
+        return res.status(401).json({ error: "Unauthorized: Invalid API Key" });
+    }
+    next();
+});
+
 //routes
 const endpoints = ["armor", "backpacks", "helmets", "guns", "rigs"] as const;
 type TableName = (typeof endpoints)[number];
@@ -18,7 +31,8 @@ type TableName = (typeof endpoints)[number];
 //Function to fetch data from all the tables
 const fetchData = async (table: TableName, res: Response) => {
     try{
-        const [rows] = await db.query(`SELECT * FROM ${table}`);
+        const query = `SELECT * FROM ??`;
+        const [rows] = await db.query(query, [table]);
         res.json({ [table]: rows});
     }catch(error){
         console.error(`Error fetching ${table}:`, error);
@@ -28,10 +42,8 @@ const fetchData = async (table: TableName, res: Response) => {
 
 //generate the routes
 endpoints.forEach(endpoint => {
-    app.get(`/${endpoint}`, (req: Request, res: Response) => fetchData(endpoint, res));
+    app.get(`/${endpoint}`, (req: Request, res: Response) => 
+        fetchData(endpoint, res));
 });
 
-//start server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+module.exports.handler = serverless(app);

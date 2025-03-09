@@ -15,11 +15,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const db_1 = __importDefault(require("./db"));
+const serverless_http_1 = __importDefault(require("serverless-http"));
 const app = (0, express_1.default)();
 const PORT = 3000;
 //cors so frontend can access the api
 app.use((0, cors_1.default)({
-    origin: "*", //need to restrict this
+    origin: "http://localhost:5173",
     methods: ["GET"],
 }));
 //routes
@@ -39,7 +40,4 @@ const fetchData = (table, res) => __awaiter(void 0, void 0, void 0, function* ()
 endpoints.forEach(endpoint => {
     app.get(`/${endpoint}`, (req, res) => fetchData(endpoint, res));
 });
-//start server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+module.exports.handler = (0, serverless_http_1.default)(app);
