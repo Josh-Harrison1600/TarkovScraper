@@ -13,31 +13,76 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const cors_1 = __importDefault(require("cors"));
 const db_1 = __importDefault(require("./db"));
 const serverless_http_1 = __importDefault(require("serverless-http"));
 const app = (0, express_1.default)();
-const PORT = 3000;
-//cors so frontend can access the api
+// Explicitly set CORS to allow requests from your frontend
 app.use((0, cors_1.default)({
-    origin: "http://localhost:5173",
+    origin: "*",
     methods: ["GET"],
+    allowedHeaders: ["Content-Type", "x-api-key"],
 }));
-//routes
+// Middleware to handle CORS preflight requests
+app.options("*", (req, res, next) => {
+    res.set({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, x-api-key",
+    });
+    res.sendStatus(200);
+    next();
+});
+// Rate Limiter
+const limiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    message: { error: "Too many requests, try again later" },
+    headers: true,
+});
+app.use((req, res, next) => limiter(req, res, next));
+// Allowed endpoints
 const endpoints = ["armor", "backpacks", "helmets", "guns", "rigs"];
-//Function to fetch data from all the tables
+// Function to fetch data from the database
 const fetchData = (table, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [rows] = yield db_1.default.query(`SELECT * FROM ${table}`);
-        res.json({ [table]: rows });
+        // Validate that the table name is allowed
+        if (!endpoints.includes(table)) {
+            return res.status(400).json({
+                error: "Invalid table name",
+                headers: {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, x-api-key",
+                }
+            });
+        }
+        const query = `SELECT * FROM ??`;
+        const [rows] = yield db_1.default.query(query, [table]);
+        return res.status(200)
+            .set({
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, x-api-key",
+        })
+            .json({ [table]: rows });
     }
     catch (error) {
         console.error(`Error fetching ${table}:`, error);
-        res.status(500).json({ error: `Failed to fetch ${table} data` });
+        return res.status(500)
+            .set({
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, x-api-key",
+        })
+            .json({ error: `Failed to fetch ${table} data` });
     }
 });
-//generate the routes
+// Generate the routes
 endpoints.forEach(endpoint => {
-    app.get(`/${endpoint}`, (req, res) => fetchData(endpoint, res));
+    app.get(`/${endpoint}`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        yield fetchData(endpoint, res);
+    }));
 });
 module.exports.handler = (0, serverless_http_1.default)(app);
