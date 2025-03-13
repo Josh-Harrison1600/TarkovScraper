@@ -8,21 +8,31 @@ async function scrapeRigs() {
     console.log("Fetched HTML for Rigs");
 
     const $ = load(data);
-    const rigs: string[] = [];
+    const rigs: { name: string; category: string }[] = [];
 
-    $('table.wikitable tbody tr').each((_, row) => {
-      const rigName = $(row).find('th a').text().trim();
-      if (rigName) {
-        console.log("Found rig:", rigName);
-        rigs.push(rigName);
-      }
-    });
+    //function to extract rigs from a specific category
+    const extractRigsFromCategory = (categoryId: string, categoryName: string): void => {
+      const categorySection = $(`#${categoryId}`).parent(); 
+      const categoryTable = categorySection.nextAll('table.wikitable').first(); 
+
+      categoryTable.find('tbody tr').each((_, row) => {
+        const rigName = $(row).find('th a').text().trim();
+        if (rigName) {
+          console.log(`Found ${categoryName}:`, rigName);
+          rigs.push({ name: rigName, category: categoryName });
+        }
+      });
+    };
+
+    extractRigsFromCategory('Armored', 'Armored Rigs');
+    extractRigsFromCategory('Unarmored', 'Unarmored Rigs');
+    
 
     const connection = await db.getConnection();
-    await connection.query(`CREATE TABLE IF NOT EXISTS rigs (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) UNIQUE)`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS rigs (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) UNIQUE, category VARCHAR(50) NOT NULL)`);
     
     for (const item of rigs) {
-      await connection.query(`INSERT INTO rigs (name) VALUES (?) ON DUPLICATE KEY UPDATE name=name`, [item]);
+      await connection.query(`INSERT INTO rigs (name, category) VALUES (?, ?) ON DUPLICATE KEY UPDATE category=VALUES(category)`, [item.name, item.category]);
     }
 
     connection.release();
